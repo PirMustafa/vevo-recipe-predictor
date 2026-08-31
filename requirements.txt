@@ -1,0 +1,20 @@
+# PINNED DELIBERATELY. The trained models are pickled scikit-learn objects,
+# and scikit-learn gives NO pickle compatibility guarantee across versions.
+# Deploying with sklearn 1.7.2 against models pickled by 1.9.0 failed with
+#   'ClassifierChain' object has no attribute 'base_estimator'
+# The app loaded, printed a healthy banner, and then returned HTTP 500 on the
+# first real request. Change these only by retraining the models to match.
+#
+# torch is NOT pinned here: install it FIRST from the CUDA index, e.g.
+#   pip install torch --index-url https://download.pytorch.org/whl/cu128
+# A plain install pulls a CPU wheel and inference degrades from ~30s to
+# ~26 minutes per prediction, silently.
+
+numpy==2.5.1
+pandas==2.3.3
+scikit-learn==1.9.0
+scipy==1.18.0
+joblib==1.5.3
+pyarrow==24.0.0
+tabicl==2.1.1
+flask==3.1.3

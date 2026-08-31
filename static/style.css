@@ -1,0 +1,1035 @@
+/* ==========================================================================
+   Vevo Recipe Predictor
+
+   Instrument-grade, not SaaS-grade: this is lab software for ink formulators,
+   so the visual language is calm, precise and data-forward. Colour is spent on
+   the measurement itself; chrome stays quiet.
+
+   Palette is grounded in the product -- the accent is Process Blue and the
+   brand mark carries Yellow / Red 032 / Process Blue, three of the fourteen
+   real colorants in the UFO White PE system.
+
+   Both themes are defined token-level. Dark is a deliberate design, not an
+   inversion: a lab or press hall is often dim, and the operator is reading
+   fine numeric detail for long stretches.
+   ========================================================================== */
+
+:root {
+  color-scheme: light;
+
+  /* --- glass -------------------------------------------------------------
+     Surfaces are translucent and refract the ambient colorant field behind
+     them. Three rules keep this instrument-grade rather than decorative:
+
+       1. Panel alpha stays high (.74). Long numeric reading is the job; a
+          prettier, thinner glass that costs contrast is the wrong trade.
+       2. Only top-level surfaces get backdrop-filter. Nesting one blur inside
+          another muddies both and multiplies an expensive filter.
+       3. saturate() does more work than blur() here -- it is what makes the
+          colour behind read as *refracted* instead of merely faded.
+     --------------------------------------------------------------------- */
+  --glass-blur:  saturate(1.7) blur(18px);
+  --glass-hi:    rgba(255, 255, 255, .85);   /* lit top edge */
+  --glass-lo:    rgba(16, 20, 26, .05);      /* grounded bottom edge */
+
+  --paper:       #EEF0F3;
+  --panel:       rgba(255, 255, 255, .74);
+  --panel-2:     rgba(246, 248, 250, .52);
+  --panel-solid: #FFFFFF;                    /* raised chips: see .tab.active */
+  --line:        rgba(18, 24, 33, .11);
+  --line-soft:   rgba(18, 24, 33, .06);
+
+  --ink:         #14171B;
+  --ink-soft:    #545C66;
+  --ink-faint:   #8B939D;
+
+  --accent:      #0072CE;          /* UFO50022 process blue */
+  --accent-ink:  #005CA8;
+  --accent-soft: #E8F2FB;
+  --accent-line: #BBD9F0;
+
+  --good:        #10784E;
+  --good-soft:   #E7F4ED;
+  --good-line:   #BEE0CE;
+  --warn:        #8A6212;
+  --warn-soft:   #FBF3E3;
+  --warn-line:   #EBDCB8;
+  --danger:      #B3261E;
+  --danger-soft: #FCEFEE;
+  --danger-line: #F0CFCC;
+
+  --radius:      14px;
+  --radius-sm:   9px;
+  --radius-xs:   6px;
+
+  /* Glass reads as a floating sheet, so the lift is softer and wider than the
+     tight shadow an opaque card wants. */
+  --shadow-sm:   0 1px 2px rgba(16, 20, 26, .05);
+  --shadow:      0 1px 2px rgba(16, 20, 26, .04), 0 18px 44px -24px rgba(16, 20, 26, .34);
+  --shadow-lg:   0 2px 6px rgba(16, 20, 26, .05), 0 34px 74px -32px rgba(16, 20, 26, .40);
+
+  --font-ui:   "Segoe UI Variable Display", "Segoe UI", system-ui, -apple-system,
+               "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "Cascadia Mono", "SF Mono", Consolas, ui-monospace, "Roboto Mono", monospace;
+
+  /* Chart ink, read by app.js so canvas drawing follows the theme. */
+  --curve-light: #0072CE;
+  --curve-dark:  #1B2027;
+  --grid:        #E7EAED;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    /* Dark glass needs a LOWER alpha than light glass to read as glass at all
+       -- a dark translucent sheet over a dark ground is nearly invisible, so
+       the colour behind has to carry the effect. The lit edge drops to a faint
+       white so it reads as a highlight, not a border. */
+    --glass-hi:    rgba(255, 255, 255, .14);
+    --glass-lo:    rgba(0, 0, 0, .22);
+    --paper:       #0B0D10;
+    --panel:       rgba(23, 27, 34, .62);
+    --panel-2:     rgba(12, 15, 19, .46);
+    --panel-solid: #1B1F26;
+    --line:        rgba(255, 255, 255, .10);
+    --line-soft:   rgba(255, 255, 255, .06);
+    --ink:         #E8EAED;
+    --ink-soft:    #A3ACB6;
+    --ink-faint:   #6E7883;
+    --accent:      #4DA3E0;
+    --accent-ink:  #7FBEEB;
+    --accent-soft: #14232F;
+    --accent-line: #24455F;
+    --good:        #4FA97C;
+    --good-soft:   #12241B;
+    --good-line:   #234936;
+    --warn:        #C99B41;
+    --warn-soft:   #241E12;
+    --warn-line:   #4A3D21;
+    --danger:      #E0776E;
+    --danger-soft: #251516;
+    --danger-line: #4D2A28;
+    --shadow-sm:   0 1px 2px rgba(0, 0, 0, .40);
+    --shadow:      0 1px 2px rgba(0, 0, 0, .38), 0 18px 44px -24px rgba(0, 0, 0, .82);
+    --shadow-lg:   0 2px 6px rgba(0, 0, 0, .42), 0 34px 74px -32px rgba(0, 0, 0, .90);
+    --curve-light: #4DA3E0;
+    --curve-dark:  #C6CDD6;
+    --grid:        #242931;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  /* Must stay in step with the prefers-color-scheme block above -- these two
+     are the same theme reached by two different routes (explicit toggle vs OS
+     default), and a value changed in only one of them produces a theme that
+     looks different depending on how the user got there. */
+  --glass-hi:    rgba(255, 255, 255, .14);
+  --glass-lo:    rgba(0, 0, 0, .22);
+  --paper:       #0B0D10;
+  --panel:       rgba(23, 27, 34, .62);
+  --panel-2:     rgba(12, 15, 19, .46);
+  --panel-solid: #1B1F26;
+  --line:        rgba(255, 255, 255, .10);
+  --line-soft:   rgba(255, 255, 255, .06);
+  --ink:         #E8EAED;
+  --ink-soft:    #A3ACB6;
+  --ink-faint:   #6E7883;
+  --accent:      #4DA3E0;
+  --accent-ink:  #7FBEEB;
+  --accent-soft: #14232F;
+  --accent-line: #24455F;
+  --good:        #4FA97C;
+  --good-soft:   #12241B;
+  --good-line:   #234936;
+  --warn:        #C99B41;
+  --warn-soft:   #241E12;
+  --warn-line:   #4A3D21;
+  --danger:      #E0776E;
+  --danger-soft: #251516;
+  --danger-line: #4D2A28;
+  --shadow-sm:   0 1px 2px rgba(0, 0, 0, .40);
+  --shadow:      0 1px 2px rgba(0, 0, 0, .38), 0 18px 44px -24px rgba(0, 0, 0, .82);
+  --shadow-lg:   0 2px 6px rgba(0, 0, 0, .42), 0 34px 74px -32px rgba(0, 0, 0, .90);
+  --curve-light: #4DA3E0;
+  --curve-dark:  #C6CDD6;
+  --grid:        #242931;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ---------- glass surfaces ------------------------------------------------
+   One rule, one list. Every surface here sits DIRECTLY on the ambient field,
+   which is the whole precondition for glass: backdrop-filter samples what is
+   painted behind, so a card nested inside another card has only its parent's
+   already-blurred pixels to work with and comes out muddy at twice the cost.
+   Wells and chips inside these surfaces (.tabs, textarea, .chart-wrap, the
+   file drop) are deliberately NOT listed -- they get their translucency from
+   --panel-2 alone and stay cheap.
+
+   The two inset lines are the whole illusion: a lit top edge where light
+   catches the sheet, and a grounded bottom edge where it meets its shadow.
+
+   Every selector below is prefixed with :root purely for specificity. The
+   component rules further down the file set their own box-shadow, and an
+   equal-specificity rule placed earlier would silently lose to them -- this
+   layer has to win by weight, not by sitting at the bottom of the file where
+   the next edit could reorder it.
+   ------------------------------------------------------------------------ */
+:root .panel,
+:root .metric,
+:root .icon-btn,
+:root .brand-mark,
+:root .pipeline-step {
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow:
+    inset 0 1px 0 var(--glass-hi),
+    inset 0 -1px 0 var(--glass-lo),
+    var(--shadow-sm);
+}
+:root .panel {
+  box-shadow:
+    inset 0 1px 0 var(--glass-hi),
+    inset 0 -1px 0 var(--glass-lo),
+    var(--shadow);
+}
+
+/* Chips that must read as RAISED off a glass well need an opaque fill --
+   translucent-on-translucent reads as a smudge, not a selection. */
+:root .tab.active,
+:root .scale-opt.active {
+  background: var(--panel-solid);
+}
+
+/* Without backdrop-filter the panels would be plain washes of semi-transparent
+   colour over a drifting field -- unreadable. Fall back to opaque surfaces. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root { --panel: #FFFFFF; --panel-2: #F5F7F9; }
+  /* The dark override stays inside its own media query. Unguarded,
+     :not([data-theme="light"]) also matches the un-stamped light default and
+     would paint dark panels under a light theme. */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --panel: #15181D; --panel-2: #1B1F25; }
+  }
+  :root[data-theme="dark"] { --panel: #15181D; --panel-2: #1B1F25; }
+  /* :root prefix so this outranks the later .ambient rule on specificity
+     rather than relying on source order. */
+  :root .ambient { opacity: .30; }
+}
+
+/* Transparency is an accessibility setting, not a taste. Honour it: solid
+   surfaces, no blur, and the field pulled right back. */
+@media (prefers-reduced-transparency: reduce) {
+  :root { --panel: #FFFFFF; --panel-2: #F5F7F9; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --panel: #15181D; --panel-2: #1B1F25; }
+  }
+  :root[data-theme="dark"] { --panel: #15181D; --panel-2: #1B1F25; }
+  .panel, .metric, .icon-btn, .brand-mark, .pipeline-step {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  :root .ambient { opacity: .18; }
+}
+
+/* ---------- ambient colorant field --------------------------------------- */
+/* Built from real inks in the system rather than arbitrary decoration. Kept
+   deliberately faint: this sits behind dense numeric data that operators read
+   for long stretches, so it must never compete with the content. Movement is
+   transform-only (GPU-composited, no repaint) and the gradients carry their own
+   soft falloff, so no expensive blur filter is needed.
+
+   Lifted since the panels went to glass: the field is now read THROUGH the
+   surfaces rather than only around them, so it has to carry real structure --
+   a flat wash refracts into nothing and the glass just looks like fog. The
+   gradient stops are tighter than before for the same reason: definition, not
+   brightness, is what a translucent sheet has to work with. */
+.ambient {
+  position: fixed;
+  inset: -18%;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  opacity: .60;
+}
+.ambient-orb {
+  position: absolute;
+  display: block;
+  width: 46vw;
+  height: 46vw;
+  min-width: 340px;
+  min-height: 340px;
+  border-radius: 50%;
+  will-change: transform;
+}
+.orb-yellow {
+  top: -6%; left: 2%;
+  background: radial-gradient(circle, rgba(254, 221, 0, .40) 0%, rgba(254, 221, 0, 0) 62%);
+  animation: drift-a 104s ease-in-out infinite;
+}
+.orb-blue {
+  top: 8%; right: -4%;
+  background: radial-gradient(circle, rgba(0, 133, 202, .40) 0%, rgba(0, 133, 202, 0) 62%);
+  animation: drift-b 127s ease-in-out infinite;
+}
+.orb-rubine {
+  bottom: -10%; left: 22%;
+  background: radial-gradient(circle, rgba(206, 0, 88, .32) 0%, rgba(206, 0, 88, 0) 62%);
+  animation: drift-c 143s ease-in-out infinite;
+}
+.orb-green {
+  bottom: 4%; right: 12%;
+  background: radial-gradient(circle, rgba(0, 166, 81, .30) 0%, rgba(0, 166, 81, 0) 62%);
+  animation: drift-d 118s ease-in-out infinite;
+}
+.orb-violet {
+  top: 34%; left: 34%;
+  background: radial-gradient(circle, rgba(68, 0, 153, .28) 0%, rgba(68, 0, 153, 0) 62%);
+  animation: drift-e 161s ease-in-out infinite;
+}
+
+/* Durations are mutually prime-ish so the field never visibly loops. */
+@keyframes drift-a {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  33%      { transform: translate3d(9vw, 6vh, 0) scale(1.12); }
+  66%      { transform: translate3d(-5vw, 11vh, 0) scale(.94); }
+}
+@keyframes drift-b {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  40%      { transform: translate3d(-11vw, 9vh, 0) scale(1.08); }
+  70%      { transform: translate3d(-4vw, -7vh, 0) scale(.92); }
+}
+@keyframes drift-c {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  45%      { transform: translate3d(13vw, -8vh, 0) scale(1.1); }
+  75%      { transform: translate3d(4vw, -3vh, 0) scale(.96); }
+}
+@keyframes drift-d {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  35%      { transform: translate3d(-8vw, -10vh, 0) scale(.9); }
+  68%      { transform: translate3d(-14vw, 4vh, 0) scale(1.14); }
+}
+@keyframes drift-e {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50%      { transform: translate3d(7vw, -13vh, 0) scale(1.16); }
+}
+
+/* Dark grounds swallow low-alpha colour, so the field is lifted to stay
+   perceptible without ever approaching the text contrast budget. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .ambient { opacity: .70; }
+}
+:root[data-theme="dark"] .ambient { opacity: .70; }
+
+.app {
+  position: relative;
+  z-index: 1;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 30px 28px 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+/* ---------- header ------------------------------------------------------- */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 20px;
+  min-width: 0;
+}
+
+.brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
+
+/* Three real colorants from the ink set, stacked like a drawdown. */
+.brand-mark {
+  display: flex;
+  flex-direction: column;
+  gap: 2.5px;
+  padding: 4px;
+  width: 20px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  box-shadow: var(--shadow-sm);
+  flex: none;
+}
+.brand-mark-swatch { display: block; height: 6px; border-radius: 2px; }
+
+.brand-text { min-width: 0; }
+.brand h1 {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -.022em;
+  margin: 0;
+  color: var(--ink);
+  text-wrap: balance;
+  overflow-wrap: break-word;
+}
+.brand h1 .brand-accent { font-weight: 450; color: var(--ink-soft); }
+.brand p {
+  font-size: 12.5px;
+  color: var(--ink-faint);
+  margin: 2px 0 0;
+  overflow-wrap: break-word;
+}
+
+.topbar-right { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; min-width: 0; }
+
+.metrics { display: flex; gap: 10px; margin: 0; flex-wrap: wrap; min-width: 0; }
+.metric {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 9px 14px;
+  min-width: 0;
+  box-shadow: var(--shadow-sm);
+}
+.metric dt {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.metric dd {
+  margin: 2px 0 0;
+  font-family: var(--font-mono);
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.02em;
+  color: var(--ink);
+  line-height: 1.1;
+}
+.metric dd b { font-weight: 600; }
+.metric dd span { color: var(--ink-faint); font-size: 13px; }
+.metric small { font-size: 10.5px; color: var(--ink-faint); }
+
+.icon-btn {
+  flex: none;
+  width: 38px; height: 38px;
+  display: grid; place-items: center;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--ink-soft);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: color .15s, border-color .15s, background .15s;
+}
+.icon-btn:hover { color: var(--accent); border-color: var(--accent-line); }
+.icon-btn svg { width: 18px; height: 18px; }
+.icon-sun { display: none; }
+.icon-moon { display: block; }
+:root[data-theme="dark"] .icon-sun { display: block; }
+:root[data-theme="dark"] .icon-moon { display: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .icon-sun { display: block; }
+  :root:not([data-theme="light"]) .icon-moon { display: none; }
+}
+
+/* ---------- pipeline ----------------------------------------------------- */
+
+.pipeline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.pipeline-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 190px;
+  min-width: 0;
+  padding: 9px 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+.pipeline-num {
+  flex: none;
+  width: 19px; height: 19px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--ink-faint);
+}
+.pipeline-step.is-final {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+.pipeline-step.is-final .pipeline-num {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* ---------- layout ------------------------------------------------------- */
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.06fr) minmax(0, .94fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 22px;
+  min-width: 0;
+}
+.results-panel { position: sticky; top: 20px; }
+
+.panel h2 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--ink);
+  margin: 0 0 16px;
+  text-wrap: balance;
+}
+.h2-icon { width: 16px; height: 16px; color: var(--accent); flex: none; }
+
+/* ---------- tabs --------------------------------------------------------- */
+
+.tabs {
+  display: flex;
+  gap: 3px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  padding: 3px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 16px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.tab {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 7px 12px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-xs);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: background .15s, color .15s, box-shadow .15s;
+}
+.tab:hover { color: var(--ink); }
+.tab.active {
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+}
+
+.tab-content { margin-bottom: 18px; }
+
+.hint {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  margin: 0 0 12px;
+  line-height: 1.55;
+  overflow-wrap: break-word;
+}
+.hint code {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  padding: 0 5px;
+  border-radius: var(--radius-xs);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- inputs ------------------------------------------------------- */
+
+.file-drop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  height: 74px;
+  border: 1.5px dashed var(--line);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink-soft);
+  background: var(--panel-2);
+  transition: border-color .15s, background .15s, color .15s;
+}
+.file-drop:hover { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink); }
+.file-drop input { display: none; }
+.file-drop-icon { width: 17px; height: 17px; flex: none; }
+
+textarea, #target-input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  background: var(--panel-2);
+  color: var(--ink);
+  font-size: 12.5px;
+  transition: border-color .15s, background .15s, box-shadow .15s;
+}
+textarea {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  resize: vertical;
+  margin-bottom: 10px;
+  min-height: 84px;
+}
+#target-input { font-family: inherit; font-size: 13px; margin-bottom: 10px; }
+textarea:focus, #target-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--panel);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+textarea::placeholder, #target-input::placeholder { color: var(--ink-faint); }
+
+/* ---------- paired paste boxes -------------------------------------------- */
+/* The label on each box states its backing, so the fact never has to be
+   inferred from the numbers (unreliable -- see app.js) nor hand-written as
+   JSON by the operator. */
+.paste-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.paste-slot { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.paste-slot label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  font-weight: 650;
+  color: var(--ink-soft);
+}
+.paste-slot label .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.paste-slot label .dot.light { background: var(--curve-light); }
+.paste-slot label .dot.dark { background: var(--curve-dark); }
+.paste-slot textarea { margin-bottom: 0; min-height: 74px; }
+.paste-json-note { font-size: 11.5px; margin-bottom: 12px; }
+
+/* ---------- buttons ------------------------------------------------------ */
+
+.primary-btn, .secondary-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: background .15s, border-color .15s, color .15s, box-shadow .15s;
+}
+.secondary-btn {
+  width: 100%;
+  padding: 10px 14px;
+  font-size: 12.5px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+.secondary-btn:hover { border-color: var(--accent-line); color: var(--accent-ink); background: var(--accent-soft); }
+.secondary-btn svg { width: 15px; height: 15px; flex: none; }
+
+.primary-btn {
+  width: 100%;
+  padding: 13px 18px;
+  font-size: 13.5px;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  color: #fff;
+  box-shadow: var(--shadow-sm);
+}
+.primary-btn:hover:not(:disabled) { background: var(--accent-ink); border-color: var(--accent-ink); }
+.primary-btn:disabled {
+  background: var(--panel-2);
+  border-color: var(--line);
+  color: var(--ink-faint);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.btn-spinner { display: none; width: 14px; height: 14px; flex: none; }
+.primary-btn.is-loading .btn-spinner {
+  display: block;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.status-text {
+  font-size: 12px;
+  margin: 10px 0 0;
+  color: var(--ink-faint);
+  overflow-wrap: anywhere;
+  min-height: 1em;
+}
+.status-text.ok { color: var(--good); }
+.status-text.warn { color: var(--warn); }
+.status-text.error { color: var(--danger); }
+
+/* ---------- spectrum chart ----------------------------------------------- */
+
+.chart-wrap { margin: 0 0 4px; }
+.chart-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 7px;
+  flex-wrap: wrap;
+}
+.chart-title {
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.chart-range {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-faint);
+}
+
+/* Compact sibling of .tabs. Deliberately quieter than the input tabs above --
+   this adjusts how a curve is drawn, it is not a step in the workflow. */
+.chart-scale {
+  display: flex;
+  gap: 2px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  padding: 2px;
+  border-radius: var(--radius-xs);
+}
+.scale-opt {
+  padding: 3px 9px;
+  border: none;
+  background: transparent;
+  border-radius: calc(var(--radius-xs) - 1px);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--ink-faint);
+  cursor: pointer;
+  transition: background .15s, color .15s, box-shadow .15s;
+}
+.scale-opt:hover { color: var(--ink); }
+.scale-opt.active {
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+}
+#spectrum-chart {
+  width: 100%;
+  height: auto;
+  display: block;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  border-bottom: none;
+}
+/* The horizontal axis is literally 380-730nm, so the ramp is the axis legend. */
+.spectrum-strip {
+  height: 7px;
+  border: 1px solid var(--line);
+  border-top: none;
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  background: linear-gradient(90deg,
+    #4B0F8B 0%, #3620C4 9%, #1C48D8 18%, #0E86C8 28%,
+    #10A88B 38%, #3FB53F 47%, #9FC22B 56%, #E0B419 65%,
+    #E8862A 75%, #D8412E 85%, #8E1F1C 94%, #5B1412 100%);
+  opacity: .85;
+}
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 9px;
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  min-width: 0;
+}
+.chart-legend span { display: inline-flex; align-items: center; gap: 6px; transition: opacity .15s; }
+.chart-legend .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.chart-legend .dot.light { background: var(--curve-light); }
+.chart-legend .dot.dark { background: var(--curve-dark); }
+
+/* ---------- empty & loading states --------------------------------------- */
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 46px 20px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--ink-faint);
+  background: var(--panel-2);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-sm);
+}
+.empty-icon { width: 30px; height: 30px; color: var(--line); }
+.empty-state strong { color: var(--ink-soft); }
+
+.loading-state {
+  padding: 22px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+.load-steps { list-style: none; margin: 0 0 18px; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.load-step { display: flex; gap: 11px; align-items: flex-start; font-size: 13px; color: var(--ink-faint); }
+.load-step .ls-dot {
+  flex: none;
+  width: 11px; height: 11px;
+  margin-top: 4px;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  background: var(--panel);
+}
+.load-step .ls-text { display: flex; flex-direction: column; min-width: 0; }
+.load-step small { font-size: 11px; color: var(--ink-faint); }
+.load-step.is-active { color: var(--ink); font-weight: 600; }
+.load-step.is-active .ls-dot {
+  border-color: var(--accent);
+  background: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+.load-step.is-done .ls-dot { border-color: var(--good); background: var(--good); }
+.load-step.is-done { color: var(--ink-soft); }
+
+.load-meter {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+}
+.load-meter-fill {
+  display: block;
+  height: 100%;
+  width: 34%;
+  border-radius: 999px;
+  background: var(--accent);
+  animation: sweep 1.6s ease-in-out infinite;
+}
+@keyframes sweep {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(330%); }
+}
+.load-elapsed {
+  margin: 11px 0 0;
+  font-size: 11.5px;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+#load-elapsed-val { font-family: var(--font-mono); color: var(--ink-soft); }
+
+/* ---------- banners ------------------------------------------------------ */
+
+.mode-banner { display: flex; flex-direction: column; gap: 4px; }
+.mode-banner .mb-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 9px; min-width: 0; }
+.mode-banner .mb-acc { font-family: var(--font-mono); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.mode-banner .mb-delta {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  opacity: .85;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+/* Shown in place of .mb-delta when no gap-vs-both can honestly be quoted --
+   the mode's accuracy was measured against a different presence threshold.
+   Deliberately quieter than .mb-delta: it is a caveat, not a score. */
+.mode-banner .mb-note {
+  font-size: 10.5px;
+  line-height: 1.35;
+  color: var(--ink-soft);
+  opacity: .9;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.mode-banner .mb-advice { color: var(--ink-soft); }
+.mode-banner.full { background: var(--good-soft); border-color: var(--good-line); }
+.mode-banner.full strong, .mode-banner.full .mb-acc { color: var(--good); }
+.mode-banner.degraded { background: var(--warn-soft); border-color: var(--warn-line); }
+.mode-banner.degraded strong, .mode-banner.degraded .mb-acc { color: var(--warn); }
+
+.review-banner {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  background: var(--danger-soft);
+  border-color: var(--danger-line);
+  color: var(--ink-soft);
+}
+.review-banner .rb-icon { flex: none; width: 18px; height: 18px; color: var(--danger); margin-top: 1px; }
+.review-banner strong { display: block; margin-bottom: 2px; color: var(--danger); }
+/* Only rendered when a recipe trips more than one review reason at once. */
+.review-banner .rb-list { margin: 0; padding-left: 17px; display: flex; flex-direction: column; gap: 5px; }
+
+/* ---------- recipe list -------------------------------------------------- */
+
+.recipe-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+.recipe-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+  padding: 9px 11px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  animation: rowIn .32s ease both;
+}
+@keyframes rowIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+
+.recipe-row .swatch {
+  flex: none;
+  width: 26px; height: 26px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
+}
+.recipe-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.recipe-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+  overflow-wrap: break-word;
+  min-width: 0;
+}
+.recipe-bar-track { height: 5px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.recipe-bar-fill { display: block; height: 100%; width: 0; border-radius: 999px; transition: width .5s cubic-bezier(.4, 0, .2, 1); }
+.recipe-pct {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.sum-check {
+  margin: 12px 0 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-faint);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- nearest Pantone ---------------------------------------------- */
+
+/* ---------- footer ------------------------------------------------------- */
+
+.footer { border-top: 1px solid var(--line); padding-top: 16px; }
+.footer p {
+  margin: 0;
+  max-width: 78ch;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--ink-faint);
+}
+
+/* ==========================================================================
+   Resilience pass -- text reflow, focus, motion, forced colours
+   ========================================================================== */
+
+:where(a, button, input, textarea, label, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+.file-drop:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+:focus:not(:focus-visible) { outline: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .load-meter-fill { animation: none !important; width: 100% !important; }
+  .recipe-row { animation: none !important; }
+  /* The ambient field keeps its colour but stops moving entirely -- the tint
+     is the point, the drift is the flourish, and only the flourish is unsafe. */
+  .ambient-orb { animation: none !important; }
+}
+
+/* Forced-colors discards the field completely; it is decoration and must not
+   interfere with a user who has asked for a strict system palette. */
+@media (forced-colors: active) {
+  .ambient { display: none; }
+}
+
+@media (forced-colors: active) {
+  .panel, .metric, .pipeline-step, .mode-banner, .review-banner,
+  .recipe-bar-fill, .swatch, .spectrum-strip { forced-color-adjust: none; }
+}
+
+@media (max-width: 940px) {
+  .layout { grid-template-columns: 1fr; }
+  .results-panel { position: static; }
+}
+
+@media (max-width: 560px) {
+  .app { padding: 20px 14px 44px; gap: 16px; }
+  .panel { padding: 17px; }
+  .topbar-right { width: 100%; justify-content: space-between; }
+  .metrics { flex: 1 1 auto; }
+  .metric { flex: 1 1 auto; }
+  .pipeline-step { flex: 1 1 100%; }
+}

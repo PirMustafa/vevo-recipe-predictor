@@ -1,0 +1,10 @@
+# Stale duplicate copies of the pipeline. Without these, the backup tree
+# contributes ~85% of all graph nodes and swamps the live code, distorting
+# clustering, god-nodes and every query with dead near-duplicates.
+_backup_pre_stage12_experiments/
+New folder/
+
+# Tool + training artifacts, not source.
+graphify-out/
+catboost_info/
+test_spectra/

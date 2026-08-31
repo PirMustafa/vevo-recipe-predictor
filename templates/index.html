@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Vevo Recipe Predictor</title>
+<!-- No webfonts by design: this ships as an offline-capable desktop tool, and a
+     silently-failing font CDN is a fragility we do not need. System faces only. -->
+<!-- ?v= is the asset mtime (app.py:_asset_version). It makes an updated file a
+     new URL, so a browser holding the page open across a restart cannot keep
+     running the old JavaScript. -->
+<link rel="stylesheet" href="/static/style.css?v={{ v }}">
+</head>
+<body>
+
+<!-- Ambient field. Every colour below is a real colorant from the UFO White PE
+     set the tool predicts against - yellow, process blue, rubine red, green and
+     violet - so the background is literally made of the inks in the system.
+     Drift is ~2 minutes per cycle: perceptible if you look for it, invisible
+     while you work. Frozen entirely under prefers-reduced-motion. -->
+<div class="ambient" aria-hidden="true">
+  <span class="ambient-orb orb-yellow"></span>
+  <span class="ambient-orb orb-blue"></span>
+  <span class="ambient-orb orb-rubine"></span>
+  <span class="ambient-orb orb-green"></span>
+  <span class="ambient-orb orb-violet"></span>
+</div>
+
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <span class="brand-mark-swatch" style="background:#FEDD00"></span>
+        <span class="brand-mark-swatch" style="background:#EF3340"></span>
+        <span class="brand-mark-swatch" style="background:#0085CA"></span>
+      </span>
+      <span class="brand-text">
+        <h1>Vevo <span class="brand-accent">Recipe Predictor</span></h1>
+        <p>Reflectance spectrum &rarr; ink recipe &middot; UFO White&nbsp;PE system</p>
+      </span>
+    </div>
+
+    <div class="topbar-right">
+      <dl class="metrics">
+        <!-- These describe the LIGHT-backing model, which is the production
+             path per the client's brief (light spectral data only, M0 only).
+             The threshold must stay on the label: 88.2% is measured against
+             the client's real 0.1% working minimum, whereas the project's
+             historical 87.2%/0.0081 were measured against a 2% convention
+             that ignored any ink below 2%. Those two numbers answer different
+             questions and must never be shown as a before/after pair -- on the
+             0.1% question the superseded model scores 59.3%. -->
+        <div class="metric">
+          <dt>Colorant ID</dt>
+          <dd><b>88.2</b><span>%</span></dd>
+          <small>exact-match &middot; 0.1% threshold</small>
+        </div>
+        <div class="metric">
+          <dt>Concentration</dt>
+          <dd><b>0.0090</b></dd>
+          <small>MAE &middot; light backing</small>
+        </div>
+      </dl>
+      <button id="theme-toggle" class="icon-btn" type="button"
+              aria-label="Switch between light and dark appearance">
+        <svg class="icon-sun" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="12" cy="12" r="4.2" stroke="currentColor" stroke-width="1.7"/>
+          <path d="M12 2.6v2.2M12 19.2v2.2M21.4 12h-2.2M4.8 12H2.6M18.6 5.4l-1.6 1.6M7 17l-1.6 1.6M18.6 18.6L17 17M7 7L5.4 5.4"
+                stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+        </svg>
+        <svg class="icon-moon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M20 14.2A8.2 8.2 0 019.8 4a8.4 8.4 0 108.9 12.5c.4-.7.9-1.6 1.3-2.3z"
+                stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- A real four-step sequence, so the numbering carries information. -->
+  <ol class="pipeline">
+    <li class="pipeline-step"><span class="pipeline-num">1</span>Measured spectrum</li>
+    <li class="pipeline-step"><span class="pipeline-num">2</span>Which colorants</li>
+    <li class="pipeline-step"><span class="pipeline-num">3</span>How much of each</li>
+    <li class="pipeline-step is-final"><span class="pipeline-num">4</span>Recipe</li>
+  </ol>
+
+  <main class="layout">
+
+    <section class="panel input-panel" aria-labelledby="h-input">
+      <h2 id="h-input">
+        <svg class="h2-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 12h4l2.5-7L14 19l2.5-7H21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Spectrum input
+      </h2>
+
+      <div class="tabs" role="tablist" aria-label="Spectrum source">
+        <button class="tab active" data-tab="sample" role="tab" type="button" aria-selected="true">Sample</button>
+        <button class="tab" data-tab="upload" role="tab" type="button" aria-selected="false">Upload</button>
+        <button class="tab" data-tab="paste" role="tab" type="button" aria-selected="false">Paste</button>
+      </div>
+
+      <div class="tab-content" id="tab-sample">
+        <p class="hint">Load the bundled example measurement to try the tool immediately.</p>
+        <button id="load-sample-btn" class="secondary-btn" type="button">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v13m0 0l-4-4m4 4l4-4M5 21h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Load sample spectrum
+        </button>
+      </div>
+
+      <div class="tab-content" id="tab-upload" hidden>
+        <p class="hint">A JSON file containing <code>R_light</code>, <code>R_dark</code>, or both &mdash;
+          36 values each, 380&ndash;730&nbsp;nm in 10&nbsp;nm steps.</p>
+        <label class="file-drop" for="file-input">
+          <svg viewBox="0 0 24 24" fill="none" class="file-drop-icon" aria-hidden="true"><path d="M12 15V4m0 0L7 9m5-5l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 15v3a2 2 0 002 2h12a2 2 0 002-2v-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <input type="file" id="file-input" accept="application/json,.json">
+          <span id="file-drop-label">Choose a file&hellip;</span>
+        </label>
+      </div>
+
+      <div class="tab-content" id="tab-paste" hidden>
+        <p class="hint">Paste <strong>36 plain numbers</strong> into whichever box matches how the
+          sample was measured. Fill one, or both for best accuracy. Commas, spaces or one per
+          line all work.</p>
+
+        <!-- Two labelled boxes rather than one box plus a selector: the backing
+             cannot be inferred from the numbers (checked -- guessing by
+             brightness is wrong 12% of the time), but nor should anyone have to
+             hand-write JSON to state it. The label IS the box. -->
+        <div class="paste-pair">
+          <div class="paste-slot">
+            <label for="paste-light"><i class="dot light" aria-hidden="true"></i>Over light backing</label>
+            <textarea id="paste-light" rows="4" spellcheck="false"
+                      placeholder="0.1518, 0.1518, 0.1518, …"></textarea>
+          </div>
+          <div class="paste-slot">
+            <label for="paste-dark"><i class="dot dark" aria-hidden="true"></i>Over dark backing</label>
+            <textarea id="paste-dark" rows="4" spellcheck="false"
+                      placeholder="0.1506, 0.1421, 0.1345, …"></textarea>
+          </div>
+        </div>
+        <p class="hint paste-json-note">Already have JSON with <code>R_light</code> /
+          <code>R_dark</code>? Paste the whole object into either box &mdash; it will be read as-is.</p>
+
+        <button id="paste-load-btn" class="secondary-btn" type="button">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Load pasted spectrum
+        </button>
+      </div>
+
+      <figure class="chart-wrap">
+        <figcaption class="chart-head">
+          <span class="chart-title">Reflectance</span>
+          <!-- Dark-backing spectra can sit under 1% reflectance across the whole
+               range, so on a fixed 0-1 axis they are a flat line. Default is a
+               panel per backing, each on its own axis; 0-1 compares their true
+               magnitudes, log puts both on one axis across the decades. -->
+          <span class="chart-scale" role="group" aria-label="Vertical axis scale">
+            <button type="button" class="scale-opt active" data-scale="fit"
+                    title="A panel per backing, each scaled to its own curve">Fit each</button>
+            <button type="button" class="scale-opt" data-scale="full"
+                    title="Both curves on one 0-1 axis, true relative magnitude">0&ndash;1</button>
+            <button type="button" class="scale-opt" data-scale="log"
+                    title="Both curves on one logarithmic axis">Log</button>
+          </span>
+        </figcaption>
+        <canvas id="spectrum-chart" width="1280" height="520"
+                aria-label="Reflectance curves for the loaded spectrum"></canvas>
+        <!-- The x-axis IS the visible spectrum, so this strip is data, not decoration. -->
+        <div class="spectrum-strip" aria-hidden="true"></div>
+        <div class="chart-legend">
+          <span><i class="dot light"></i>Over light backing</span>
+          <span><i class="dot dark"></i>Over dark backing</span>
+        </div>
+      </figure>
+
+      <button id="predict-btn" class="primary-btn" type="button" disabled>
+        <span class="btn-spinner" aria-hidden="true"></span>
+        <span class="btn-label">Predict recipe</span>
+      </button>
+      <p id="input-status" class="status-text" role="status"></p>
+    </section>
+
+    <section class="panel results-panel" aria-labelledby="h-results">
+      <h2 id="h-results">
+        <svg class="h2-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4L12 2z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+        Predicted recipe
+      </h2>
+
+      <div id="results-empty" class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" class="empty-icon" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.3"/><path d="M8 12.5l2.5 2.5L16 9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>Load a spectrum, then choose <strong>Predict recipe</strong>.</span>
+      </div>
+
+      <!-- Inference runs 60-90s. An undesigned wait reads as a frozen page, so the
+           wait itself gets a state: which stage is running, and for how long. -->
+      <div id="results-loading" class="loading-state" hidden>
+        <ol class="load-steps">
+          <li id="load-step-1" class="load-step"><span class="ls-dot"></span>
+            <span class="ls-text">Identifying colorants<small>Stage 1 &middot; TabICL on GPU</small></span></li>
+          <li id="load-step-2" class="load-step"><span class="ls-dot"></span>
+            <span class="ls-text">Estimating concentrations<small>Stage 2 &middot; per-colorant regressors</small></span></li>
+        </ol>
+        <div class="load-meter"><span class="load-meter-fill"></span></div>
+        <p class="load-elapsed"><span id="load-elapsed-val">0s</span> elapsed &middot; usually 60&ndash;90s</p>
+      </div>
+
+      <div id="results-content" hidden>
+        <div id="mode-banner" class="mode-banner" hidden></div>
+        <div id="review-banner" class="review-banner" hidden></div>
+        <ul id="recipe-list" class="recipe-list"></ul>
+        <p class="sum-check" id="sum-check"></p>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <p>Recipe accuracy (MAE / exact-match) is validated against held-out test data. Predicted-recipe
+      <em>colour</em> accuracy has not been independently verified by physical drawdown &mdash; treat
+      output as a starting point, not a final formulation.</p>
+  </footer>
+
+</div>
+<script src="/static/app.js?v={{ v }}"></script>
+</body>
+</html>

@@ -1,0 +1,52 @@
+# Without this file the build context is over 2 GB and the image build either
+# crawls or fails. Everything excluded here is either huge, rebuildable, or
+# must not travel into an image at all.
+
+# Backups: 1.4 GB of historical snapshots. Never belongs in an image.
+_backup_pre_stage12_experiments/
+
+# Trained models: 576 MB, fetched from S3 at container start instead (see
+# entrypoint.sh). Keeping them out means a retrain does not require an image
+# rebuild and push.
+models/
+
+# Source archives: 40 MB, superseded by the working tree.
+*.zip
+
+# The local virtualenv is Windows-built and useless in a Linux image; the
+# image installs its own from requirements.txt.
+.venv/
+__pycache__/
+*.pyc
+
+# Raw measurement data. The app does not read the CxF files at serve time
+# (only training does), and they are client data, so they stay out.
+*.cxf
+
+# Tooling and analysis output, none of it needed to serve requests.
+graphify-out/
+catboost_info/
+.claude/
+test_spectra/
+*.log
+*.aux
+*.out
+*.pdf
+*.tex
+
+# Experiment and training scripts. The container only serves predictions;
+# training happens offline on a machine with the data.
+train.py
+train_backing_modes.py
+train_inverse.py
+eval_*.py
+exp_*.py
+backup.py
+forward_model_test.py
+
+# Docs and notes.
+README.md
+extended_experiment_log.txt
+*.xlsx
+*.csv
+"New folder"/

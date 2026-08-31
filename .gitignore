@@ -1,0 +1,57 @@
+# ---------------------------------------------------------------------------
+# CLIENT DATA -- never commit. This is Flint Group's proprietary measurement
+# and formulation data. Publishing it, even to a private repo, puts commercial
+# information outside their control.
+# ---------------------------------------------------------------------------
+*.cxf
+*.xlsx
+*.csv
+test_spectra/
+test_examples/
+sample_spectrum.json
+
+# ---------------------------------------------------------------------------
+# TRAINED MODELS -- 603 MB of pickled artifacts, and they encode the training
+# data. They live in S3 (s3://vevo-models-735539227526/models/) and are pulled
+# at deploy time, so they do not belong in version control.
+# ---------------------------------------------------------------------------
+models/
+*.joblib
+
+# ---------------------------------------------------------------------------
+# BACKUPS -- 1.4 GB of historical snapshots. Git is the version history now.
+# ---------------------------------------------------------------------------
+_backup_pre_stage12_experiments/
+
+# ---------------------------------------------------------------------------
+# Environments and build artifacts
+# ---------------------------------------------------------------------------
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+catboost_info/
+*.zip
+
+# ---------------------------------------------------------------------------
+# Generated output
+# ---------------------------------------------------------------------------
+graphify-out/
+*.pdf
+*.log
+*.aux
+*.out
+*.toc
+New folder/
+
+# ---------------------------------------------------------------------------
+# Local tooling and anything that could carry a secret
+# ---------------------------------------------------------------------------
+.claude/
+.aws/
+*.pem
+*.key
+.env
+.env.*
+credentials
